@@ -1,4 +1,4 @@
-import { Keymap, Menu, Plugin, type HoverParent, type WorkspaceLeaf } from "obsidian";
+import { Keymap, Menu, Plugin, type HoverParent, type PaneType, type WorkspaceLeaf } from "obsidian";
 import { Breadcrumbs } from "./breadcrumbs";
 import { registerTocCodeBlock } from "./codeblock";
 import { pickRootAndGenerate } from "./export";
@@ -98,17 +98,37 @@ export default class BtocPlugin extends Plugin {
 		view?.setFocus(id);
 	}
 
-	/** Opens a node's note; a missing node's note is created. Modifier keys open in a new tab/split. */
+	/**
+	 * Opens a node's note in the main editor so it becomes the current note; a missing node's
+	 * note is created. Modifier keys (or middle click) open a new tab or split instead.
+	 */
 	async openNode(id: string, evt: MouseEvent): Promise<void> {
-		const newLeaf = Keymap.isModEvent(evt);
+		const ws = this.app.workspace;
+		const leaf = this.editorLeaf(Keymap.isModEvent(evt));
 		const file = this.graph.fileOf(id);
 		if (file) {
-			await this.app.workspace.getLeaf(newLeaf).openFile(file);
+			await leaf.openFile(file, { active: true });
 			return;
 		}
 		if (this.graph.isMissing(id)) {
-			await this.app.workspace.openLinkText(this.graph.missingLink(id), "", newLeaf);
+			// openLinkText targets the active leaf, so make the editor leaf active first; otherwise
+			// a click from the sidebar would replace the tree view with the new note.
+			ws.setActiveLeaf(leaf, { focus: false });
+			await ws.openLinkText(this.graph.missingLink(id), "", false);
 		}
+	}
+
+	/**
+	 * The leaf to open notes in. A plain click goes to the most recently used tab in the main
+	 * area (never a sidebar leaf, which is where the click came from), or a new tab if there is
+	 * none or it is pinned. With a modifier, Obsidian's own new-tab/split behaviour applies.
+	 */
+	private editorLeaf(newLeaf: PaneType | boolean): WorkspaceLeaf {
+		const ws = this.app.workspace;
+		if (newLeaf) return ws.getLeaf(newLeaf);
+		const recent = ws.getMostRecentLeaf(ws.rootSplit);
+		if (recent && !recent.getViewState().pinned) return recent;
+		return ws.getLeaf("tab");
 	}
 
 	hoverNode(id: string, evt: MouseEvent, target: HTMLElement | SVGElement, parent: HoverParent): void {

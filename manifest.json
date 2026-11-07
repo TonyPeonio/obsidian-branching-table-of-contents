@@ -1,7 +1,7 @@
 {
 	"id": "branching-table-of-contents",
 	"name": "Branching Table of Contents",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"minAppVersion": "1.7.2",
 	"description": "Link notes with parent/child properties and see them as a clean, rooted family tree of the current note instead of the tangled graph view.",
 	"author": "Tony Peonio",
