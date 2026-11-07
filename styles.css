@@ -1,0 +1,374 @@
+/* ---- Sidebar view ---- */
+
+.btoc-view {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 0;
+}
+
+.btoc-toolbar {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 6px;
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	flex: none;
+}
+
+.btoc-tb-group {
+	display: flex;
+	gap: 2px;
+	padding: 2px;
+	border-radius: var(--radius-s);
+	background: var(--background-secondary);
+}
+
+.btoc-tb-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 24px;
+	padding: 0;
+	border: none;
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.btoc-tb-btn:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
+.btoc-tb-btn.is-active {
+	color: var(--text-on-accent);
+	background: var(--interactive-accent);
+}
+
+.btoc-tb-btn .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.btoc-tb-levels {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.btoc-tb-level {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.btoc-tb-level-icon .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.btoc-tb-levels input {
+	width: 42px;
+	height: 24px;
+	padding: 0 2px 0 6px;
+	text-align: center;
+}
+
+.btoc-tb-spacer {
+	flex: 1;
+}
+
+.btoc-tb-btn.is-hidden,
+.btoc-tb-levels.is-hidden {
+	display: none;
+}
+
+.btoc-body {
+	flex: 1;
+	min-height: 0;
+	position: relative;
+	overflow: hidden;
+}
+
+.btoc-body.is-outline {
+	overflow: auto;
+	padding: 8px 12px;
+}
+
+/* ---- Drawn tree ---- */
+
+.btoc-svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+	cursor: grab;
+	touch-action: none;
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+.btoc-svg.is-panning {
+	cursor: grabbing;
+}
+
+.btoc-edge {
+	fill: none;
+	stroke: var(--text-faint);
+	stroke-width: 1.5;
+}
+
+.btoc-edge.is-irregular {
+	stroke-dasharray: 4 3;
+}
+
+.btoc-node {
+	cursor: pointer;
+	outline: none;
+}
+
+.btoc-node-box {
+	fill: var(--background-primary);
+	stroke: var(--background-modifier-border-hover);
+	stroke-width: 1.5;
+}
+
+.btoc-node:hover .btoc-node-box,
+.btoc-node:focus-visible .btoc-node-box {
+	stroke: var(--interactive-accent);
+	stroke-width: 2;
+}
+
+.btoc-node-label {
+	fill: var(--text-normal);
+	font-family: var(--font-interface);
+	font-size: 13px;
+	pointer-events: none;
+}
+
+.btoc-node.is-ancestor .btoc-node-box {
+	fill: var(--background-secondary);
+}
+
+.btoc-node.is-focus .btoc-node-box {
+	fill: var(--interactive-accent);
+	stroke: var(--interactive-accent);
+}
+
+.btoc-node.is-focus .btoc-node-label {
+	fill: var(--text-on-accent);
+	font-weight: 600;
+}
+
+.btoc-node.is-missing .btoc-node-box {
+	fill: transparent;
+	stroke-dasharray: 4 3;
+}
+
+.btoc-node.is-missing .btoc-node-label {
+	fill: var(--text-muted);
+	font-style: italic;
+}
+
+.btoc-badge rect {
+	fill: var(--background-modifier-border-hover);
+}
+
+.btoc-badge text {
+	fill: var(--text-muted);
+	font-family: var(--font-interface);
+	font-size: 10px;
+	pointer-events: none;
+}
+
+/* ---- Outline ---- */
+
+.btoc-outline {
+	font-size: var(--font-ui-small);
+}
+
+.btoc-item.is-collapsed > .btoc-children {
+	display: none;
+}
+
+.btoc-item.is-collapsed > .btoc-row .btoc-chevron .svg-icon {
+	transform: rotate(-90deg);
+}
+
+.btoc-children {
+	margin-left: 13px;
+	padding-left: 6px;
+	border-left: 1px solid var(--background-modifier-border);
+}
+
+.btoc-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	min-height: 24px;
+	padding: 2px 4px;
+	border-radius: var(--radius-s);
+}
+
+.btoc-row:hover {
+	background: var(--background-modifier-hover);
+}
+
+.btoc-row.is-focus {
+	background: hsla(var(--interactive-accent-hsl), 0.15);
+}
+
+.btoc-row.is-focus .btoc-link {
+	color: var(--text-accent);
+	font-weight: 600;
+}
+
+.btoc-chevron {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 16px;
+	height: 16px;
+	color: var(--text-faint);
+}
+
+.btoc-chevron.is-active {
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.btoc-chevron .svg-icon {
+	width: 14px;
+	height: 14px;
+	transition: transform 100ms ease;
+}
+
+.btoc-link {
+	overflow: hidden;
+	color: var(--text-normal);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.btoc-link:hover {
+	color: var(--text-accent);
+	text-decoration: underline;
+}
+
+.btoc-row.is-missing .btoc-link {
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.btoc-meta {
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	white-space: nowrap;
+}
+
+.btoc-meta.is-cycle {
+	color: var(--text-warning);
+}
+
+/* ---- Empty states ---- */
+
+.btoc-empty {
+	padding: 24px 16px;
+	color: var(--text-muted);
+	text-align: center;
+}
+
+.btoc-empty p {
+	margin: 0 0 8px;
+}
+
+.btoc-hint {
+	color: var(--text-faint);
+	font-size: var(--font-ui-small);
+}
+
+/* ---- Breadcrumbs ---- */
+
+.btoc-breadcrumbs {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px 4px;
+	padding: 4px 0 10px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	line-height: 1.4;
+}
+
+.btoc-crumb-icon {
+	display: flex;
+	color: var(--text-faint);
+	margin-right: 2px;
+}
+
+.btoc-crumb-icon .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.btoc-crumb {
+	padding: 1px 4px;
+	border-radius: var(--radius-s);
+	cursor: pointer;
+}
+
+.btoc-crumb:hover {
+	color: var(--text-accent);
+	background: var(--background-modifier-hover);
+}
+
+.btoc-crumb.is-current {
+	color: var(--text-normal);
+	font-weight: 600;
+	cursor: default;
+}
+
+.btoc-crumb.is-current:hover {
+	color: var(--text-normal);
+	background: transparent;
+}
+
+.btoc-crumb-sep {
+	color: var(--text-faint);
+}
+
+.btoc-crumb-more {
+	padding: 0 5px;
+	border-radius: 8px;
+	background: var(--background-modifier-border);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	cursor: pointer;
+}
+
+.btoc-crumb-more:hover {
+	background: var(--background-modifier-border-hover);
+	color: var(--text-normal);
+}
+
+/* ---- Code block ---- */
+
+.btoc-block {
+	margin: 0.5em 0;
+}
+
+.btoc-block-tree {
+	position: relative;
+	overflow: hidden;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-primary);
+}
