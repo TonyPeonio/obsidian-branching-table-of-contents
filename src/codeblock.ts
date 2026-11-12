@@ -1,7 +1,7 @@
 import { MarkdownRenderChild, type HoverPopover } from "obsidian";
 import type { NodeActions } from "./actions";
 import { neighborhood, outline } from "./graph";
-import { layout, type Orientation } from "./layout";
+import { layout, type Orientation, type TreeStyle } from "./layout";
 import { cleanLink } from "./links";
 import type BtocPlugin from "./main";
 import { renderOutline } from "./render-outline";
@@ -17,13 +17,15 @@ export interface BlockOptions {
 	down: number;
 	mode: ViewMode;
 	orientation: Orientation | null;
+	/** Family tree or phylogenetic tree; null uses the setting. */
+	style: TreeStyle | null;
 	/** Height in pixels of a drawn tree. */
 	height: number;
 }
 
 /** Parses `key: value` lines. Unknown keys are ignored; bad values fall back to defaults. */
 export function parseBlockOptions(source: string): BlockOptions {
-	const opts: BlockOptions = { root: null, up: 0, down: 2, mode: "outline", orientation: null, height: 320 };
+	const opts: BlockOptions = { root: null, up: 0, down: 2, mode: "outline", orientation: null, style: null, height: 320 };
 	for (const line of source.split("\n")) {
 		const m = /^\s*([A-Za-z_-]+)\s*:\s*(.*?)\s*$/.exec(line);
 		if (!m) continue;
@@ -46,6 +48,10 @@ export function parseBlockOptions(source: string): BlockOptions {
 			case "orientation":
 			case "direction":
 				if (value === "top-down" || value === "left-right") opts.orientation = value;
+				break;
+			case "style":
+				if (value === "boxes" || value === "family") opts.style = "boxes";
+				else if (/^(phylogenetic|phylogenic|phylo|cladogram)$/i.test(value)) opts.style = "phylogenetic";
 				break;
 			case "height": {
 				const h = parseInt(value, 10);
@@ -114,7 +120,7 @@ class TocBlock extends MarkdownRenderChild {
 		if (this.opts.mode === "tree") {
 			const host = el.createDiv({ cls: "btoc-block-tree" });
 			host.setCssProps({ height: `${this.opts.height}px` });
-			const lay = layout(g, sub, { orientation: this.opts.orientation ?? this.plugin.settings.orientation });
+			const lay = layout(g, sub, { orientation: this.opts.orientation ?? this.plugin.settings.orientation, style: this.opts.style ?? this.plugin.settings.treeStyle });
 			this.canvas = new TreeCanvas(host, lay, this.actions, root);
 			this.addChild(this.canvas);
 		} else {

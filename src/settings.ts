@@ -1,4 +1,4 @@
-import type { Orientation } from "./layout";
+import type { Orientation, TreeStyle } from "./layout";
 
 export type ViewMode = "tree" | "outline";
 export type ViewScope = "focus" | "all";
@@ -16,6 +16,8 @@ export interface Settings {
 	defaultMode: ViewMode;
 	defaultScope: ViewScope;
 	orientation: Orientation;
+	/** How the drawn tree looks: boxes joined by curves, or a phylogenetic tree (cladogram). */
+	treeStyle: TreeStyle;
 	followActiveNote: boolean;
 	showBreadcrumbs: boolean;
 	showMissing: boolean;
@@ -36,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	defaultMode: "tree",
 	defaultScope: "focus",
 	orientation: "top-down",
+	treeStyle: "boxes",
 	followActiveNote: true,
 	showBreadcrumbs: true,
 	showMissing: true,

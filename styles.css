@@ -187,6 +187,39 @@
 	pointer-events: none;
 }
 
+/* Phylogenetic style: the branches carry the picture, so the notes are plain labels on them.
+   The box stays as the click target and as the background that keeps a branch from running
+   through a name; only the current note and a hovered one keep an outline. */
+
+.btoc-svg.is-phylo .btoc-edge {
+	stroke: var(--text-muted);
+	stroke-linejoin: round;
+	stroke-linecap: round;
+}
+
+.btoc-svg.is-phylo .btoc-node-box {
+	stroke: transparent;
+}
+
+.btoc-svg.is-phylo .btoc-node.is-ancestor .btoc-node-box {
+	fill: var(--background-primary);
+}
+
+.btoc-svg.is-phylo .btoc-node.is-ancestor .btoc-node-label {
+	fill: var(--text-muted);
+}
+
+.btoc-svg.is-phylo .btoc-node:hover .btoc-node-box,
+.btoc-svg.is-phylo .btoc-node:focus-visible .btoc-node-box,
+.btoc-svg.is-phylo .btoc-node.is-focus .btoc-node-box {
+	stroke: var(--interactive-accent);
+}
+
+.btoc-svg.is-phylo .btoc-node.is-missing .btoc-node-box {
+	fill: var(--background-primary);
+	stroke: var(--background-modifier-border-hover);
+}
+
 /* ---- Outline ---- */
 
 .btoc-outline {

@@ -34,6 +34,7 @@ export class TreeCanvas extends Component {
 		const svg = this.container.createSvg("svg", { cls: "btoc-svg" });
 		svg.setAttribute("role", "img");
 		svg.setAttribute("aria-label", "Branching table of contents");
+		if (this.lay.style === "phylogenetic") svg.addClass("is-phylo");
 		this.svg = svg;
 		const viewport = svg.createSvg("g", { cls: "btoc-viewport" });
 		this.viewport = viewport;

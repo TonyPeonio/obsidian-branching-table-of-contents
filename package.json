@@ -1,6 +1,6 @@
 {
   "name": "branching-table-of-contents",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Link notes with parent/child properties and see them as a clean, rooted family tree of the current note instead of the tangled graph view.",
   "main": "main.js",
   "private": true,

@@ -12,8 +12,17 @@ import { type Graph, type Subgraph, childrenOf, compareIds, nameOf, parentsOf } 
 
 export type Orientation = "top-down" | "left-right";
 
+/**
+ * How the tree is drawn. "boxes" is the family tree: curved links, every note on the row of its
+ * level. "phylogenetic" is the cladogram biologists draw: right-angled branches that split at a
+ * shared bar, and every tip (a note with nothing drawn below it) pushed out to the same line,
+ * so the notes at the ends of the branches can be read down one column whatever their depth.
+ */
+export type TreeStyle = "boxes" | "phylogenetic";
+
 export interface LayoutOptions {
 	orientation: Orientation;
+	style: TreeStyle;
 	nodeHeight: number;
 	charWidth: number;
 	paddingX: number;
@@ -30,6 +39,7 @@ export interface LayoutOptions {
 
 export const DEFAULT_LAYOUT: LayoutOptions = {
 	orientation: "top-down",
+	style: "boxes",
 	nodeHeight: 32,
 	charWidth: 7.4,
 	paddingX: 14,
@@ -72,6 +82,7 @@ export interface Layout {
 	edges: LayoutEdge[];
 	width: number;
 	height: number;
+	style: TreeStyle;
 }
 
 export function truncateLabel(name: string, maxChars: number): string {
@@ -92,6 +103,7 @@ interface Box {
 export function layout(g: Graph, sub: Subgraph, options: Partial<LayoutOptions> = {}): Layout {
 	const o = { ...DEFAULT_LAYOUT, ...options };
 	const lr = o.orientation === "left-right";
+	const phylo = o.style === "phylogenetic";
 	const cmp = compareIds(g);
 
 	const widthOf = new Map<string, number>();
@@ -184,6 +196,17 @@ export function layout(g: Graph, sub: Subgraph, options: Partial<LayoutOptions> 
 		pos += e + o.layerGap;
 	}
 
+	// Phylogenetic style: tips line up at the deepest level. A tip keeps the cross-axis slot the
+	// tidy tree gave it, which no other subtree enters, so moving it outward cannot collide.
+	const deepest = layers.length ? layers[layers.length - 1] : 0;
+	const tipStart = (layerPos.get(deepest) ?? 0) - (layerExtent.get(deepest) ?? o.nodeHeight) / 2;
+	const isTip = (id: string) => phylo && deepest > 0 && (sub.layer.get(id) ?? 0) > 0 && !(treeKidsDown.get(id)?.length ?? 0);
+	const alongOf = (id: string): number => {
+		if (!isTip(id)) return layerPos.get(sub.layer.get(id) ?? 0) ?? 0;
+		// Left to right the tips start on one line (their names then read as a list); top-down they share a row.
+		return lr ? tipStart + (widthOf.get(id) ?? o.minWidth) / 2 : (layerPos.get(deepest) ?? 0);
+	};
+
 	let minCross = Number.POSITIVE_INFINITY;
 	let maxCross = Number.NEGATIVE_INFINITY;
 	for (const id of sub.ids) {
@@ -199,7 +222,7 @@ export function layout(g: Graph, sub: Subgraph, options: Partial<LayoutOptions> 
 	const nodes: LayoutNode[] = sub.ids.map((id) => {
 		const l = sub.layer.get(id) ?? 0;
 		const c = (cross.get(id) ?? 0) - minCross + o.margin;
-		const lp = (layerPos.get(l) ?? 0) + o.margin;
+		const lp = alongOf(id) + o.margin;
 		const w = widthOf.get(id) ?? o.minWidth;
 		const node = g.nodes.get(id);
 		return {
@@ -223,12 +246,33 @@ export function layout(g: Graph, sub: Subgraph, options: Partial<LayoutOptions> 
 		const c = byId.get(e.child);
 		if (!p || !c) return { ...e, d: "", irregular: true };
 		const irregular = c.layer !== p.layer + 1;
-		return { ...e, d: edgePath(p, c, lr, o.layerGap), irregular };
+		// A branch only bends at right angles where it runs forward; a link back up the tree stays a curve.
+		const forward = lr ? c.x - c.w / 2 > p.x + p.w / 2 : c.y - c.h / 2 > p.y + p.h / 2;
+		return { ...e, d: phylo && forward ? elbowPath(p, c, lr, o.layerGap) : edgePath(p, c, lr, o.layerGap), irregular };
 	});
 
 	const crossSize = maxCross - minCross + 2 * o.margin;
 	const layerSize = pos - o.layerGap + 2 * o.margin;
-	return { nodes, edges, width: lr ? layerSize : crossSize, height: lr ? crossSize : layerSize };
+	return { nodes, edges, width: lr ? layerSize : crossSize, height: lr ? crossSize : layerSize, style: o.style };
+}
+
+/**
+ * A cladogram branch: out of the parent to a bar half a layer gap away, along the bar to the
+ * child's line, then straight to the child. All children of a note share the bar, which is what
+ * makes the split read as one branching point.
+ */
+function elbowPath(p: LayoutNode, c: LayoutNode, lr: boolean, layerGap: number): string {
+	const f = (n: number) => Math.round(n * 100) / 100;
+	if (lr) {
+		const sx = p.x + p.w / 2;
+		const ex = c.x - c.w / 2;
+		const bar = Math.min(sx + layerGap / 2, ex);
+		return `M ${f(sx)} ${f(p.y)} H ${f(bar)} V ${f(c.y)} H ${f(ex)}`;
+	}
+	const sy = p.y + p.h / 2;
+	const ey = c.y - c.h / 2;
+	const bar = Math.min(sy + layerGap / 2, ey);
+	return `M ${f(p.x)} ${f(sy)} V ${f(bar)} H ${f(c.x)} V ${f(ey)}`;
 }
 
 function edgePath(p: LayoutNode, c: LayoutNode, lr: boolean, layerGap: number): string {

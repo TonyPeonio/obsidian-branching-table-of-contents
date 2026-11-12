@@ -94,6 +94,7 @@ height: 400
 | `up` / `down` | 0 to 10 levels | `0` / `2` |
 | `mode` | `outline` or `tree` | `outline` |
 | `orientation` | `top-down` or `left-right` | the setting |
+| `style` | `boxes` or `phylogenetic` | the setting |
 | `height` | pixels, for `tree` | `320` |
 
 ### Settings
@@ -101,11 +102,19 @@ height: 400
 - **Properties**: parent / child / order property names, folders to exclude, whether to show
   missing notes.
 - **Tree view**: levels up and down, default view (tree or outline), default scope (current
-  note or whole vault), layout direction (top to bottom or left to right), follow the active note.
+  note or whole vault), tree style (family tree or phylogenetic tree), layout direction (top to
+  bottom or left to right), follow the active note.
 - **Breadcrumbs**: on or off.
 - **New notes**: when creating a child or parent, write the link on the new note, the existing
   note, or both.
 - **Table of contents note**: name suffix and maximum depth.
+
+**Tree style.** *Family tree* (the default) draws each note as a box on the row of its level,
+joined by curves. *Phylogenetic tree* draws the same tree the way a cladogram is drawn:
+right-angled branches that split at a shared bar, with every note at the end of a branch pushed
+out to one line, so the leaves read as a list whatever their depth. It reads best with *Layout
+direction* set to left to right. The setting applies to the tree view; a code block can choose
+its own with `style: phylogenetic`.
 
 ## How the tree is built
 

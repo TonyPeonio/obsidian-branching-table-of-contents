@@ -1,7 +1,7 @@
 import { PluginSettingTab, Setting, type App } from "obsidian";
 import type BtocPlugin from "./main";
 import { clampLevels, type NewNoteLink, type ViewMode, type ViewScope } from "./settings";
-import type { Orientation } from "./layout";
+import type { Orientation, TreeStyle } from "./layout";
 
 export class BtocSettingTab extends PluginSettingTab {
 	constructor(
@@ -118,6 +118,19 @@ export class BtocSettingTab extends PluginSettingTab {
 					.setValue(s.defaultScope)
 					.onChange((v) => {
 						s.defaultScope = v as ViewScope;
+						save();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Tree style")
+			.setDesc("Family tree draws each note as a box on the row of its level, joined by curves. Phylogenetic tree draws right-angled branches and lines up the notes at the ends of the branches, like a cladogram; it reads best left to right.")
+			.addDropdown((d) =>
+				d
+					.addOptions({ boxes: "Family tree", phylogenetic: "Phylogenetic tree" })
+					.setValue(s.treeStyle)
+					.onChange((v) => {
+						s.treeStyle = v as TreeStyle;
 						save();
 					}),
 			);

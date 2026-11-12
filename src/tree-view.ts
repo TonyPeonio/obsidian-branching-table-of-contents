@@ -218,7 +218,7 @@ export class TreeView extends ItemView {
 		}
 
 		if (this.state.mode === "tree") {
-			const lay = layout(g, sub, { orientation: s.orientation });
+			const lay = layout(g, sub, { orientation: s.orientation, style: s.treeStyle });
 			this.canvas = new TreeCanvas(body, lay, this.actions, sub.focus);
 			this.addChild(this.canvas);
 		} else {
