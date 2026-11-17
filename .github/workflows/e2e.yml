@@ -48,6 +48,16 @@ jobs:
           sleep 1
 
       - name: Run e2e tests
-        run: npx wdio run ./wdio.conf.mts
+        run: |
+          set -o pipefail
+          npx wdio run ./wdio.conf.mts 2>&1 | tee e2e.log
         env:
           OBSIDIAN_VERSIONS: earliest latest
+
+      # Make the failure readable without signing in: annotations are public, raw logs are not.
+      - name: Report failures as annotations
+        if: failure()
+        run: |
+          grep -v '^\s*at ' e2e.log | grep -iE -B2 -A12 'error|fail|✖|expect' | tail -c 30000 > e2e-failures.txt || true
+          body=$(sed -e 's/%/%25/g' e2e-failures.txt | awk '{printf "%s%%0A", $0}')
+          echo "::error title=E2E output::${body}"
