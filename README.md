@@ -64,8 +64,9 @@ in the tree, so the rest of your vault is untouched.
 Click the fork icon in the ribbon or run **Open tree view**. The view follows whichever note you
 open; use the pin button in its toolbar to stay put.
 
-Toolbar, left to right: drawn tree / outline · current note / whole vault · levels up · levels
-down · pin · fit to view. Double-click empty canvas to fit.
+Toolbar, left to right: drawn tree / outline · phylogenetic tree on/off · current note / whole
+vault · levels up · levels down · pin · fit to view. Double-click empty canvas to fit. The
+phylogenetic button is the same switch as *Settings → Tree style*.
 
 ### Commands
 

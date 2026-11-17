@@ -139,6 +139,13 @@ export class TreeView extends ItemView {
 		const modes = group(bar);
 		button(modes, "mode:tree", "git-fork", "Drawn tree", () => set("mode", "tree"));
 		button(modes, "mode:outline", "list-tree", "Outline", () => set("mode", "outline"));
+		// Same switch as Settings → Tree style, one click away: family tree ⇄ phylogenetic tree.
+		button(modes, "style", "workflow", "Phylogenetic tree", () => {
+			const s = this.plugin.settings;
+			s.treeStyle = s.treeStyle === "phylogenetic" ? "boxes" : "phylogenetic";
+			if (s.treeStyle === "phylogenetic" && this.state.mode !== "tree") this.state.mode = "tree";
+			void this.plugin.saveSettings().then(() => this.render());
+		});
 
 		const scopes = group(bar);
 		button(scopes, "scope:focus", "crosshair", "Family tree of the current note", () => set("scope", "focus"));
@@ -168,6 +175,14 @@ export class TreeView extends ItemView {
 		active("scope:focus", this.state.scope === "focus");
 		active("scope:all", this.state.scope === "all");
 		active("pinned", this.state.pinned);
+		const phylo = this.plugin.settings.treeStyle === "phylogenetic";
+		active("style", phylo && this.state.mode === "tree");
+		const style = this.buttons.get("style");
+		if (style) {
+			const label = phylo ? "Phylogenetic tree (on): click for the family tree" : "Phylogenetic tree: draw the tree as a cladogram";
+			style.setAttribute("aria-label", label);
+			style.setAttribute("title", label);
+		}
 		const pin = this.buttons.get("pinned");
 		if (pin) setIcon(pin, this.state.pinned ? "pin-off" : "pin");
 		this.buttons.get("fit")?.toggleClass("is-hidden", this.state.mode !== "tree");
