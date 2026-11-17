@@ -338,7 +338,8 @@ export class TreeCanvas extends Component {
 	private onPointerDown(evt: PointerEvent): void {
 		if (evt.button !== 0 && evt.pointerType === "mouse") return;
 		this.dragging = { id: evt.pointerId, x: evt.clientX, y: evt.clientY, tx: this.tx, ty: this.ty, moved: false };
-		this.svg?.setPointerCapture(evt.pointerId);
+		// No pointer capture yet: capturing here retargets the click that follows to the svg, so a
+		// plain click on a node would never reach the node. Capture once it is really a drag.
 	}
 
 	private onPointerMove(evt: PointerEvent): void {
@@ -347,6 +348,7 @@ export class TreeCanvas extends Component {
 		const dx = evt.clientX - d.x;
 		const dy = evt.clientY - d.y;
 		if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+		if (!d.moved) this.svg?.setPointerCapture(evt.pointerId);
 		d.moved = true;
 		this.svg?.addClass("is-panning");
 		this.tx = d.tx + dx;

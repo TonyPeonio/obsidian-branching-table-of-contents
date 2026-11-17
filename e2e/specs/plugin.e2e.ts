@@ -81,21 +81,9 @@ describe("Branching Table of Contents in Obsidian", function () {
 		expect(items.length).toBeGreaterThan(3);
 	});
 
-	it("shows its settings, including Report a problem", async function () {
-		await browser.executeObsidian(({ app }) => {
-			const setting = (app as unknown as { setting: { open(): void; openTabById(id: string): void } }).setting;
-			setting.open();
-			setting.openTabById("branching-table-of-contents");
-		});
-		const named = (text: string) => $(`//div[contains(@class,'setting-item-name') and normalize-space(.)='${text}']`);
-		await expect(named("Parent properties")).toExist();
-		await expect(named("Tree style")).toExist();
-		await expect(named("Report a problem")).toExist();
-		await browser.executeObsidian(({ app }) => (app as unknown as { setting: { close(): void } }).setting.close());
-	});
-
 	it("opens the problem report with versions and no absolute paths", async function () {
 		await browser.executeObsidianCommand(`${PLUGIN}:report-problem`);
+		await $(".btoc-report-body").waitForExist({ timeout: 10000 });
 		const body = $(".btoc-report-body");
 		await expect(body).toExist();
 		const text = await body.getValue();
@@ -103,5 +91,18 @@ describe("Branching Table of Contents in Obsidian", function () {
 		expect(text).toContain("### Graph");
 		expect(text).not.toMatch(/[A-Za-z]:\\Users\\|\/Users\/|\/home\//);
 		await browser.keys("Escape");
+	});
+
+	it("shows its settings, including Report a problem", async function () {
+		await browser.executeObsidianCommand("app:open-settings");
+		await browser.pause(500);
+		await browser.executeObsidian(({ app }) => {
+			(app as unknown as { setting: { openTabById(id: string): void } }).setting.openTabById("branching-table-of-contents");
+		});
+		const named = (text: string) => $(`//*[contains(@class,'setting-item-name') and normalize-space(.)='${text}']`);
+		await named("Parent properties").waitForExist({ timeout: 10000 });
+		await expect(named("Tree style")).toExist();
+		await expect(named("Report a problem")).toExist();
+		await browser.executeObsidian(({ app }) => (app as unknown as { setting: { close(): void } }).setting.close());
 	});
 });

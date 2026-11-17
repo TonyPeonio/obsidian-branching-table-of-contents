@@ -11,7 +11,8 @@ export const config: WebdriverIO.Config = {
 	framework: "mocha",
 	specs: ["./e2e/specs/**/*.e2e.ts"],
 	maxInstances: 1,
-	tsConfigPath: "./e2e/tsconfig.json",
+	// Absolute: tsx is injected into child processes (e.g. the installer extractor) that run elsewhere.
+	tsConfigPath: path.resolve("e2e/tsconfig.json"),
 	capabilities: versions.map((v) => ({
 		browserName: "obsidian",
 		browserVersion: v,
