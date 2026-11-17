@@ -45,6 +45,12 @@
 	background: var(--background-modifier-hover);
 }
 
+.btoc-tb-btn:focus-visible,
+.btoc-tb-levels input:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
+}
+
 .btoc-tb-btn.is-active {
 	color: var(--text-on-accent);
 	background: var(--interactive-accent);
@@ -120,7 +126,8 @@
 
 .btoc-edge {
 	fill: none;
-	stroke: var(--text-faint);
+	stroke: var(--text-muted);
+	stroke-opacity: 0.75;
 	stroke-width: 1.5;
 }
 
@@ -135,7 +142,7 @@
 
 .btoc-node-box {
 	fill: var(--background-primary);
-	stroke: var(--background-modifier-border-hover);
+	stroke: var(--text-faint);
 	stroke-width: 1.5;
 }
 
@@ -143,6 +150,12 @@
 .btoc-node:focus-visible .btoc-node-box {
 	stroke: var(--interactive-accent);
 	stroke-width: 2;
+}
+
+/* Keyboard focus: a thick ring that also shows on the accent-filled current note. */
+.btoc-node:focus-visible .btoc-node-box {
+	stroke: var(--text-normal);
+	stroke-width: 3;
 }
 
 .btoc-node-label {
@@ -181,7 +194,7 @@
 }
 
 .btoc-badge text {
-	fill: var(--text-muted);
+	fill: var(--text-normal);
 	font-family: var(--font-interface);
 	font-size: 10px;
 	pointer-events: none;
@@ -210,9 +223,12 @@
 }
 
 .btoc-svg.is-phylo .btoc-node:hover .btoc-node-box,
-.btoc-svg.is-phylo .btoc-node:focus-visible .btoc-node-box,
 .btoc-svg.is-phylo .btoc-node.is-focus .btoc-node-box {
 	stroke: var(--interactive-accent);
+}
+
+.btoc-svg.is-phylo .btoc-node:focus-visible .btoc-node-box {
+	stroke: var(--text-normal);
 }
 
 .btoc-svg.is-phylo .btoc-node.is-missing .btoc-node-box {
@@ -251,6 +267,15 @@
 
 .btoc-row:hover {
 	background: var(--background-modifier-hover);
+}
+
+.btoc-item {
+	outline: none;
+}
+
+.btoc-item:focus-visible > .btoc-row {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
 }
 
 .btoc-row.is-focus {
@@ -302,7 +327,7 @@
 }
 
 .btoc-meta {
-	color: var(--text-faint);
+	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 	white-space: nowrap;
 }
@@ -324,7 +349,7 @@
 }
 
 .btoc-hint {
-	color: var(--text-faint);
+	color: var(--text-muted);
 	font-size: var(--font-ui-small);
 }
 
@@ -356,6 +381,12 @@
 	padding: 1px 4px;
 	border-radius: var(--radius-s);
 	cursor: pointer;
+}
+
+.btoc-crumb:focus-visible,
+.btoc-crumb-more:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 1px;
 }
 
 .btoc-crumb:hover {
@@ -404,4 +435,54 @@
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m);
 	background: var(--background-primary);
+}
+
+/* ---- Feedback prompt (one time, dismissible) ---- */
+
+.btoc-feedback {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 8px;
+	padding: 8px 10px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	flex: none;
+}
+
+.btoc-feedback-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+/* ---- Report a problem ---- */
+
+.btoc-report-intro {
+	margin-top: 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.btoc-report-title {
+	width: 100%;
+}
+
+.btoc-report-body {
+	width: 100%;
+	min-height: 260px;
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+	resize: vertical;
+}
+
+/* ---- Reduced motion ---- */
+
+@media (prefers-reduced-motion: reduce) {
+	.btoc-chevron .svg-icon {
+		transition: none;
+	}
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildGraph, forest, neighborhood, type Edge, type GraphNode } from "../src/graph";
-import { layout, truncateLabel, type LayoutNode } from "../src/layout";
+import { layout, neighborInDirection, truncateLabel, type LayoutNode } from "../src/layout";
 
 const node = (id: string, missing = false): GraphNode => ({ id, name: id, missing });
 const chain = (...ids: string[]): Edge[] => ids.slice(1).map((c, i) => ({ parent: ids[i], child: c }));
@@ -235,5 +235,18 @@ describe("truncateLabel", () => {
 	it("shortens long names with an ellipsis", () => {
 		expect(truncateLabel("short", 10)).toBe("short");
 		expect(truncateLabel("a very long note title indeed", 10)).toBe("a very lo…");
+	});
+});
+
+describe("neighborInDirection", () => {
+	const n = (id: string, x: number, y: number) => ({ id, label: id, name: id, missing: false, layer: 0, x, y, w: 60, h: 30, hiddenParents: [], hiddenChildren: [] });
+	const nodes = [n("top", 100, 0), n("left", 0, 100), n("mid", 100, 100), n("right", 220, 100), n("below", 130, 200), n("farBelow", 400, 200)];
+	it("picks the nearest node in each direction, preferring straight ahead", () => {
+		expect(neighborInDirection(nodes, "mid", "up")).toBe("top");
+		expect(neighborInDirection(nodes, "mid", "down")).toBe("below");
+		expect(neighborInDirection(nodes, "mid", "left")).toBe("left");
+		expect(neighborInDirection(nodes, "mid", "right")).toBe("right");
+		expect(neighborInDirection(nodes, "top", "up")).toBeNull();
+		expect(neighborInDirection(nodes, "nope", "up")).toBeNull();
 	});
 });

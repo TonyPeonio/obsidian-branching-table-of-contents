@@ -3,8 +3,8 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { NodeActions } from "../src/actions";
 import { buildGraph, forest, neighborhood, outline, type Edge, type GraphNode } from "../src/graph";
 import { layout } from "../src/layout";
-import { renderOutline } from "../src/render-outline";
-import { TreeCanvas } from "../src/render-tree";
+import { countItems, renderOutline } from "../src/render-outline";
+import { LAZY_NODES, TreeCanvas } from "../src/render-tree";
 import { installObsidianDom } from "./dom";
 
 const node = (id: string, missing = false): GraphNode => ({ id, name: id, missing });
@@ -39,11 +39,12 @@ describe("TreeCanvas", () => {
 		const svg = container.querySelector("svg.btoc-svg");
 		expect(svg).not.toBeNull();
 		expect(container.querySelectorAll(".btoc-node")).toHaveLength(sub.ids.length);
-		expect(container.querySelectorAll(".btoc-edge")).toHaveLength(sub.edges.length);
+		const segments = Array.from(container.querySelectorAll(".btoc-edge")).reduce((n, p) => n + (p.getAttribute("d")?.match(/M /g)?.length ?? 0), 0);
+		expect(segments).toBe(sub.edges.length);
 		expect(container.querySelectorAll(".btoc-node.is-focus")).toHaveLength(1);
 		expect(container.querySelectorAll(".btoc-node.is-missing")).toHaveLength(1);
 		expect(container.querySelectorAll(".btoc-node.is-ancestor").length).toBeGreaterThan(0);
-		expect(container.querySelector(".btoc-node.is-focus")?.getAttribute("aria-label")).toBe("X");
+		expect(container.querySelector(".btoc-node.is-focus")?.getAttribute("aria-label")).toBe("X, current note");
 
 		const focusEl = container.querySelector<SVGGElement>(".btoc-node.is-focus");
 		if (!focusEl || !svg) throw new Error("missing elements");
@@ -144,5 +145,121 @@ describe("renderOutline", () => {
 		const sub = forest(g);
 		renderOutline(container, g, outline(g, sub), actions(), { focus: null, collapsed: new Set() });
 		expect(container.querySelectorAll(".btoc-meta.is-cycle").length).toBeGreaterThan(0);
+	});
+});
+
+describe("keyboard navigation", () => {
+	it("moves between drawn nodes with arrow keys using one Tab stop", () => {
+		const container = document.body.createDiv();
+		const sub = neighborhood(g, "X", 1, 1);
+		const lay = layout(g, sub);
+		const act = actions();
+		const canvas = new TreeCanvas(container, lay, act, "X");
+		canvas.load();
+		const tabStops = container.querySelectorAll(".btoc-node[tabindex='0']");
+		expect(tabStops).toHaveLength(1);
+		const focusEl = tabStops[0] as SVGGElement;
+		expect(focusEl.dataset.id).toBe("X");
+		expect(focusEl.getAttribute("aria-current")).toBe("page");
+		expect(container.querySelector("svg")?.getAttribute("role")).toBe("group");
+
+		focusEl.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+		const up = container.querySelector<SVGGElement>(".btoc-node[tabindex='0']");
+		expect(up?.dataset.id).toBe("A");
+		expect(document.activeElement).toBe(up);
+		expect(up?.getAttribute("aria-label")).toBe("A, parent, 1 more parent not shown");
+
+		up?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+		expect(container.querySelector<SVGGElement>(".btoc-node[tabindex='0']")?.dataset.id).toBe("B");
+
+		const b = container.querySelector<SVGGElement>(".btoc-node[tabindex='0']");
+		b?.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+		expect(container.querySelector<SVGGElement>(".btoc-node[tabindex='0']")?.dataset.id).toBe("X");
+
+		focusEl.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		expect(act.open).toHaveBeenCalledWith("X", expect.any(MouseEvent));
+		focusEl.dispatchEvent(new KeyboardEvent("keydown", { key: "ContextMenu", bubbles: true }));
+		expect(act.menu).toHaveBeenCalledWith("X", expect.any(MouseEvent));
+		canvas.unload();
+	});
+
+	it("follows the ARIA tree pattern in the outline", () => {
+		const container = document.body.createDiv();
+		const act = actions();
+		const sub = neighborhood(g, "X", 0, 2);
+		renderOutline(container, g, outline(g, sub), act, { focus: "X", collapsed: new Set(), label: "Family tree of X" });
+		const tree = container.querySelector("[role=tree]");
+		expect(tree?.getAttribute("aria-label")).toBe("Family tree of X");
+		const items = () => Array.from(container.querySelectorAll<HTMLElement>("[role=treeitem]"));
+		const stops = () => items().filter((el) => el.getAttribute("tabindex") === "0");
+		expect(stops()).toHaveLength(1);
+		const root = stops()[0];
+		expect(root.dataset.id).toBe("X");
+		expect(root.getAttribute("aria-expanded")).toBe("true");
+		expect(root.getAttribute("aria-level")).toBe("1");
+
+		const key = (el: Element, k: string) => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+		key(root, "ArrowDown");
+		expect(document.activeElement?.getAttribute("data-id")).toBe("C");
+		expect(document.activeElement?.getAttribute("aria-level")).toBe("2");
+		expect(stops()).toHaveLength(1);
+		key(document.activeElement!, "ArrowLeft"); // C is expanded (has E): collapse it
+		expect(document.activeElement?.getAttribute("aria-expanded")).toBe("false");
+		key(document.activeElement!, "ArrowLeft"); // now go to the parent
+		expect(document.activeElement).toBe(root);
+		key(root, "ArrowLeft");
+		expect(root.getAttribute("aria-expanded")).toBe("false");
+		key(root, "ArrowDown"); // nothing visible below a collapsed root
+		expect(document.activeElement).toBe(root);
+		key(root, "ArrowRight");
+		expect(root.getAttribute("aria-expanded")).toBe("true");
+		key(root, "End");
+		expect(document.activeElement).not.toBe(root);
+		key(document.activeElement!, "Home");
+		expect(document.activeElement).toBe(root);
+		key(root, "Enter");
+		expect(act.open).toHaveBeenCalledWith("X", expect.any(MouseEvent));
+	});
+});
+
+describe("large trees", () => {
+	it("creates nodes lazily as they come into view, and on keyboard focus", () => {
+		const n = LAZY_NODES + 200;
+		const ids = Array.from({ length: n }, (_, i) => `n${String(i).padStart(4, "0")}`);
+		const big = buildGraph(
+			ids.map((id) => node(id)),
+			ids.slice(1).map((id, i) => ({ parent: ids[Math.floor(i / 3)], child: id })),
+		);
+		const lay = layout(big, forest(big));
+		const container = document.body.createDiv();
+		Object.defineProperty(container, "clientWidth", { value: 400 });
+		Object.defineProperty(container, "clientHeight", { value: 300 });
+		const canvas = new TreeCanvas(container, lay, actions(), null);
+		canvas.load();
+		expect(canvas.drawnCount).toBeGreaterThan(0);
+		expect(canvas.drawnCount).toBeLessThan(n / 2);
+		const far = lay.nodes.reduce((a, b) => (b.x > a.x ? b : a));
+		canvas.focusNode(far.id);
+		expect(container.querySelector(`.btoc-node[data-id="${far.id}"]`)).not.toBeNull();
+		expect(document.activeElement?.getAttribute("data-id")).toBe(far.id);
+		canvas.unload();
+	});
+});
+
+describe("large outlines", () => {
+	it("starts deep branches collapsed and builds them only when opened", () => {
+		const container = document.body.createDiv();
+		const expanded = new Set<string>();
+		const collapsed = new Set<string>();
+		const items = outline(g, neighborhood(g, "X", 0, 3));
+		expect(countItems(items)).toBeGreaterThan(3);
+		renderOutline(container, g, items, actions(), { focus: "X", collapsed, expanded, collapseBelowLevel: 1 });
+		const all = () => container.querySelectorAll("[role=treeitem]");
+		expect(all()).toHaveLength(1);
+		const root = all()[0] as HTMLElement;
+		expect(root.getAttribute("aria-expanded")).toBe("false");
+		root.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+		expect(all().length).toBeGreaterThan(1);
+		expect(expanded.has("X")).toBe(true);
 	});
 });

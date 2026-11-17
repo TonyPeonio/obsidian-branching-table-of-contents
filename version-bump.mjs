@@ -9,3 +9,7 @@ writeFileSync("manifest.json", JSON.stringify(manifest, null, "\t") + "\n");
 const versions = JSON.parse(readFileSync("versions.json", "utf8"));
 versions[targetVersion] = minAppVersion;
 writeFileSync("versions.json", JSON.stringify(versions, null, "\t") + "\n");
+
+// A stable release also moves the beta channel up to it, so BRAT beta testers are never left on
+// an older beta than what the store offers.
+writeFileSync("manifest-beta.json", JSON.stringify(manifest, null, "\t") + "\n");

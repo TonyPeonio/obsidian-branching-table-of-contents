@@ -174,7 +174,9 @@ export function layout(g: Graph, sub: Subgraph, options: Partial<LayoutOptions> 
 		}
 	}
 	// Anything the spanning tree missed (should not happen) goes at the end of its layer.
-	let fallback = Math.max(0, ...[...cross.values()]) + o.gap;
+	let fallback = 0;
+	for (const c of cross.values()) fallback = Math.max(fallback, c);
+	fallback += o.gap;
 	for (const id of sub.ids) {
 		if (cross.has(id)) continue;
 		cross.set(id, fallback + ext(id) / 2);
@@ -182,12 +184,14 @@ export function layout(g: Graph, sub: Subgraph, options: Partial<LayoutOptions> 
 	}
 
 	// Layer axis.
-	const layers = [...new Set(sub.ids.map((id) => sub.layer.get(id) ?? 0))].sort((a, b) => a - b);
+	// One pass over the nodes (filtering per layer was quadratic on deep whole-vault trees).
 	const layerExtent = new Map<number, number>();
-	for (const l of layers) {
-		const members = sub.ids.filter((id) => sub.layer.get(id) === l);
-		layerExtent.set(l, lr ? Math.max(...members.map((id) => widthOf.get(id) ?? o.minWidth)) : o.nodeHeight);
+	for (const id of sub.ids) {
+		const l = sub.layer.get(id) ?? 0;
+		const e = lr ? (widthOf.get(id) ?? o.minWidth) : o.nodeHeight;
+		layerExtent.set(l, Math.max(layerExtent.get(l) ?? 0, e));
 	}
+	const layers = [...layerExtent.keys()].sort((a, b) => a - b);
 	const layerPos = new Map<number, number>();
 	let pos = 0;
 	for (const l of layers) {
@@ -297,4 +301,32 @@ function pushTo(map: Map<string, string[]>, key: string, value: string): void {
 	const list = map.get(key);
 	if (list) list.push(value);
 	else map.set(key, [value]);
+}
+
+export type Direction = "up" | "down" | "left" | "right";
+
+/**
+ * The node to move keyboard focus to when an arrow key is pressed: the nearest node whose centre
+ * lies in that direction, preferring nodes straight ahead (sideways distance counts three
+ * times as much). Null when there is none.
+ */
+export function neighborInDirection(nodes: LayoutNode[], fromId: string, dir: Direction): string | null {
+	const from = nodes.find((n) => n.id === fromId);
+	if (!from) return null;
+	let best: string | null = null;
+	let bestScore = Number.POSITIVE_INFINITY;
+	for (const n of nodes) {
+		if (n.id === fromId) continue;
+		const dx = n.x - from.x;
+		const dy = n.y - from.y;
+		const ahead = dir === "down" ? dy : dir === "up" ? -dy : dir === "right" ? dx : -dx;
+		const side = dir === "down" || dir === "up" ? Math.abs(dx) : Math.abs(dy);
+		if (ahead <= 0.5) continue;
+		const score = ahead + 3 * side;
+		if (score < bestScore) {
+			bestScore = score;
+			best = n.id;
+		}
+	}
+	return best;
 }

@@ -67,17 +67,26 @@ export class Breadcrumbs {
 	private fill(bar: HTMLElement, trail: string[], view: MarkdownView): void {
 		const g = this.plugin.graph.graph;
 		bar.empty();
-		const icon = bar.createSpan({ cls: "btoc-crumb-icon" });
+		bar.setAttribute("role", "navigation");
+		bar.setAttribute("aria-label", "Breadcrumbs");
+		const icon = bar.createSpan({ cls: "btoc-crumb-icon", attr: { "aria-hidden": "true" } });
 		setIcon(icon, "git-fork");
 		trail.forEach((id, i) => {
-			if (i > 0) bar.createSpan({ cls: "btoc-crumb-sep", text: "›" });
+			if (i > 0) bar.createSpan({ cls: "btoc-crumb-sep", text: "›", attr: { "aria-hidden": "true" } });
 			const current = i === trail.length - 1;
 			const crumb = bar.createSpan({ cls: "btoc-crumb", text: nameOf(g, id) });
-			if (current) crumb.addClass("is-current");
-			else {
+			if (current) {
+				crumb.addClass("is-current");
+				crumb.setAttribute("aria-current", "page");
+			} else {
 				crumb.setAttribute("role", "link");
 				crumb.setAttribute("tabindex", "0");
 				crumb.addEventListener("click", (evt) => void this.plugin.openNode(id, evt));
+				crumb.addEventListener("keydown", (evt) => {
+					if (evt.key !== "Enter" && evt.key !== " ") return;
+					evt.preventDefault();
+					void this.plugin.openNode(id, new MouseEvent("click", { ctrlKey: evt.ctrlKey, metaKey: evt.metaKey }));
+				});
 				crumb.addEventListener("auxclick", (evt) => {
 					if (evt.button === 1) void this.plugin.openNode(id, evt);
 				});
@@ -96,6 +105,12 @@ export class Breadcrumbs {
 				cls: "btoc-crumb-more",
 				text: `+${others.length}`,
 				attr: { "aria-label": `Other parents of ${nameOf(g, next)}`, role: "button", tabindex: "0" },
+			});
+			more.addEventListener("keydown", (evt) => {
+				if (evt.key !== "Enter" && evt.key !== " ") return;
+				evt.preventDefault();
+				const box = more.getBoundingClientRect();
+				more.dispatchEvent(new MouseEvent("click", { clientX: box.left, clientY: box.bottom }));
 			});
 			more.addEventListener("click", (evt) => {
 				const menu = new Menu();

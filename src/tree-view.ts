@@ -2,8 +2,10 @@ import { ItemView, setIcon, type HoverPopover, type ViewStateResult, type Worksp
 import type { NodeActions } from "./actions";
 import { forest, neighborhood, outline, type Subgraph } from "./graph";
 import { layout } from "./layout";
+import { log } from "./log";
 import type BtocPlugin from "./main";
-import { renderOutline } from "./render-outline";
+import { LARGE_OUTLINE, countItems, renderOutline } from "./render-outline";
+import { shouldAskForFeedback } from "./report";
 import { TreeCanvas } from "./render-tree";
 import { clampLevels, firstProperty, type ViewMode, type ViewScope } from "./settings";
 
@@ -27,6 +29,7 @@ export class TreeView extends ItemView {
 	private bodyEl: HTMLElement | null = null;
 	private canvas: TreeCanvas | null = null;
 	private collapsed = new Set<string>();
+	private expanded = new Set<string>();
 	private buttons = new Map<string, HTMLElement>();
 	private upInput: HTMLInputElement | null = null;
 	private downInput: HTMLInputElement | null = null;
@@ -67,9 +70,10 @@ export class TreeView extends ItemView {
 
 	onOpen(): Promise<void> {
 		this.contentEl.addClass("btoc-view");
-		this.toolbarEl = this.contentEl.createDiv({ cls: "btoc-toolbar" });
+		this.toolbarEl = this.contentEl.createDiv({ cls: "btoc-toolbar", attr: { role: "group", "aria-label": "Tree view controls" } });
 		this.bodyEl = this.contentEl.createDiv({ cls: "btoc-body" });
 		this.buildToolbar(this.toolbarEl);
+		this.countOpenAndMaybeAsk();
 
 		this.registerEvent(this.plugin.graph.on("changed", () => this.render()));
 		this.registerEvent(this.app.workspace.on("file-open", (file) => this.followActive(file?.path ?? null)));
@@ -121,10 +125,34 @@ export class TreeView extends ItemView {
 		this.app.workspace.requestSaveLayout();
 	}
 
+	/** Counts tree-view opens for the one-time feedback prompt, and shows it when it is due. */
+	private countOpenAndMaybeAsk(): void {
+		const s = this.plugin.settings;
+		s.viewOpens++;
+		this.plugin.guard("Could not save the plugin state.", this.plugin.saveState());
+		if (!shouldAskForFeedback(s, Date.now())) return;
+		const banner = this.contentEl.createDiv({ cls: "btoc-feedback", attr: { role: "region", "aria-label": "Feedback" } });
+		this.contentEl.insertBefore(banner, this.bodyEl);
+		banner.createSpan({ cls: "btoc-feedback-text", text: "What do you use Branching Table of Contents for? A two-line answer on GitHub helps decide what to build next." });
+		const buttons = banner.createDiv({ cls: "btoc-feedback-buttons" });
+		const answer = (state: "answered" | "snoozed" | "dismissed") => {
+			banner.remove();
+			if (state === "answered") {
+				this.plugin.openFeedback();
+				return;
+			}
+			s.feedbackPrompt = state;
+			this.plugin.guard("Could not save the plugin state.", this.plugin.saveState());
+		};
+		buttons.createEl("button", { cls: "mod-cta", text: "Tell me on GitHub" }).addEventListener("click", () => answer("answered"));
+		buttons.createEl("button", { text: "Not now" }).addEventListener("click", () => answer("snoozed"));
+		buttons.createEl("button", { text: "Don't ask again" }).addEventListener("click", () => answer("dismissed"));
+	}
+
 	private buildToolbar(bar: HTMLElement): void {
-		const group = (parent: HTMLElement) => parent.createDiv({ cls: "btoc-tb-group" });
+		const group = (parent: HTMLElement, label: string) => parent.createDiv({ cls: "btoc-tb-group", attr: { role: "group", "aria-label": label } });
 		const button = (parent: HTMLElement, key: string, icon: string, label: string, onClick: () => void) => {
-			const el = parent.createEl("button", { cls: "btoc-tb-btn", attr: { "aria-label": label, title: label } });
+			const el = parent.createEl("button", { cls: "btoc-tb-btn", attr: { "aria-label": label, title: label, type: "button" } });
 			setIcon(el, icon);
 			el.addEventListener("click", onClick);
 			this.buttons.set(key, el);
@@ -136,7 +164,7 @@ export class TreeView extends ItemView {
 			this.app.workspace.requestSaveLayout();
 		};
 
-		const modes = group(bar);
+		const modes = group(bar, "View");
 		button(modes, "mode:tree", "git-fork", "Drawn tree", () => set("mode", "tree"));
 		button(modes, "mode:outline", "list-tree", "Outline", () => set("mode", "outline"));
 		// Same switch as Settings → Tree style, one click away: family tree ⇄ phylogenetic tree.
@@ -144,10 +172,10 @@ export class TreeView extends ItemView {
 			const s = this.plugin.settings;
 			s.treeStyle = s.treeStyle === "phylogenetic" ? "boxes" : "phylogenetic";
 			if (s.treeStyle === "phylogenetic" && this.state.mode !== "tree") this.state.mode = "tree";
-			void this.plugin.saveSettings().then(() => this.render());
+			this.plugin.guard("Could not save the tree style.", this.plugin.saveSettings().then(() => this.render()));
 		});
 
-		const scopes = group(bar);
+		const scopes = group(bar, "Scope");
 		button(scopes, "scope:focus", "crosshair", "Family tree of the current note", () => set("scope", "focus"));
 		button(scopes, "scope:all", "network", "Whole vault", () => set("scope", "all"));
 
@@ -163,13 +191,17 @@ export class TreeView extends ItemView {
 		this.downInput = level("arrow-down", "Levels down", "down");
 
 		bar.createDiv({ cls: "btoc-tb-spacer" });
-		const misc = group(bar);
+		const misc = group(bar, "Pin and fit");
 		button(misc, "pinned", "pin", "Pin: stop following the active note", () => set("pinned", !this.state.pinned));
 		button(misc, "fit", "maximize", "Fit to view", () => this.canvas?.fit());
 	}
 
 	private syncToolbar(): void {
-		const active = (key: string, on: boolean) => this.buttons.get(key)?.toggleClass("is-active", on);
+		const active = (key: string, on: boolean) => {
+			const el = this.buttons.get(key);
+			el?.toggleClass("is-active", on);
+			el?.setAttribute("aria-pressed", String(on));
+		};
 		active("mode:tree", this.state.mode === "tree");
 		active("mode:outline", this.state.mode === "outline");
 		active("scope:focus", this.state.scope === "focus");
@@ -232,12 +264,28 @@ export class TreeView extends ItemView {
 			}
 		}
 
-		if (this.state.mode === "tree") {
-			const lay = layout(g, sub, { orientation: s.orientation, style: s.treeStyle });
-			this.canvas = new TreeCanvas(body, lay, this.actions, sub.focus);
-			this.addChild(this.canvas);
-		} else {
-			renderOutline(body, g, outline(g, sub), this.actions, { focus: sub.focus, collapsed: this.collapsed });
+		try {
+			const label = sub.focus ? `Family tree of ${this.plugin.graph.graph.nodes.get(sub.focus)?.name ?? sub.focus}` : "All trees in the vault";
+			if (this.state.mode === "tree") {
+				const lay = layout(g, sub, { orientation: s.orientation, style: s.treeStyle });
+				this.canvas = new TreeCanvas(body, lay, this.actions, sub.focus);
+				this.addChild(this.canvas);
+			} else {
+				const items = outline(g, sub);
+				const large = countItems(items) > LARGE_OUTLINE;
+				renderOutline(body, g, items, this.actions, {
+					focus: sub.focus,
+					collapsed: this.collapsed,
+					expanded: this.expanded,
+					collapseBelowLevel: large ? 2 : undefined,
+					label,
+				});
+			}
+		} catch (err) {
+			log.error("Drawing the tree view failed", err);
+			body.empty();
+			const el = this.message(body, "Something went wrong while drawing this tree.", "The error was recorded. You can send a report with the button below; you review it first.");
+			el.createEl("button", { text: "Report a problem" }).addEventListener("click", () => this.plugin.openReportModal("Drawing the tree view failed"));
 		}
 	}
 

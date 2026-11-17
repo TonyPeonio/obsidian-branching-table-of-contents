@@ -1,9 +1,23 @@
-import { Keymap, Menu, Plugin, type HoverParent, type PaneType, type WorkspaceLeaf } from "obsidian";
+import {
+	FileSystemAdapter,
+	Keymap,
+	Menu,
+	Notice,
+	Platform,
+	Plugin,
+	apiVersion,
+	type HoverParent,
+	type PaneType,
+	type WorkspaceLeaf,
+} from "obsidian";
 import { Breadcrumbs } from "./breadcrumbs";
 import { registerTocCodeBlock } from "./codeblock";
 import { pickRootAndGenerate } from "./export";
+import { formatEntry, log } from "./log";
 import { promptRelatedNote } from "./related-notes";
-import { DEFAULT_SETTINGS, type Settings } from "./settings";
+import { buildReport, feedbackLink, graphStats, reportSettings, reportTitle } from "./report";
+import { ReportModal } from "./report-modal";
+import { DEFAULT_SETTINGS, USER_SETTING_KEYS, normalizeSetting, type Settings } from "./settings";
 import { BtocSettingTab } from "./settings-tab";
 import { TreeView, VIEW_TYPE } from "./tree-view";
 import { VaultGraph } from "./vault-graph";
@@ -17,6 +31,11 @@ export default class BtocPlugin extends Plugin {
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
+		log.info(`Loaded ${this.manifest.version} on Obsidian ${apiVersion} (${platformName()})`);
+		if (!this.settings.installedAt) {
+			this.settings.installedAt = Date.now();
+			await this.saveState();
+		}
 
 		this.registerView(VIEW_TYPE, (leaf) => new TreeView(leaf, this));
 		this.registerHoverLinkSource(HOVER_SOURCE, { display: "Branching table of contents", defaultMod: true });
@@ -63,6 +82,12 @@ export default class BtocPlugin extends Plugin {
 			callback: () => pickRootAndGenerate(this),
 		});
 
+		this.addCommand({
+			id: "report-problem",
+			name: "Report a problem",
+			callback: () => this.openReportModal(),
+		});
+
 		registerTocCodeBlock(this);
 		this.breadcrumbs.start();
 		this.addSettingTab(new BtocSettingTab(this.app, this));
@@ -71,13 +96,72 @@ export default class BtocPlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		const stored = (await this.loadData()) as Partial<Settings> | null;
-		this.settings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
+		const merged: Settings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
+		// A hand-edited or older data.json must not break the view: repair out-of-range values.
+		for (const key of USER_SETTING_KEYS) {
+			(merged as unknown as Record<string, unknown>)[key] = normalizeSetting(key, merged[key], DEFAULT_SETTINGS);
+		}
+		this.settings = merged;
 	}
 
+	/** Saves settings the user changed and redraws everything that depends on them. */
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
 		this.graph.rebuild();
 		this.breadcrumbs.refreshAll();
+	}
+
+	/** Saves internal state (counters, prompt answers) without rebuilding anything. */
+	async saveState(): Promise<void> {
+		await this.saveData(this.settings);
+	}
+
+	/** Builds the problem report from what the plugin knows and shows it for review. */
+	openReportModal(firstError?: string): void {
+		const adapter = this.app.vault.adapter;
+		const vaultPath = adapter instanceof FileSystemAdapter ? adapter.getBasePath() : null;
+		const g = this.graph.graph;
+		const body = buildReport(
+			{
+				pluginVersion: this.manifest.version,
+				obsidianVersion: apiVersion,
+				platform: platformName(),
+				theme: activeDocument.body.hasClass("theme-dark") ? "dark" : "light",
+				settings: reportSettings(this.settings),
+				stats: graphStats(g),
+				timings: this.graph.timings(),
+				log: log.last(50).map(formatEntry),
+			},
+			{ vaultPath },
+		);
+		new ReportModal(this.app, reportTitle(firstError), body).open();
+	}
+
+	/** Opens the prefilled "what do you use it for?" issue in the browser. */
+	openFeedback(): void {
+		window.open(feedbackLink(this.manifest.version));
+		this.settings.feedbackPrompt = "answered";
+		void this.saveState();
+	}
+
+	/** Logs an error and shows a notice with a link that opens the problem report. */
+	notifyError(message: string, err?: unknown): void {
+		log.error(message, err);
+		console.error(`[Branching TOC] ${message}`, err);
+		const fragment = createFragment((f) => {
+			f.appendText(message + " ");
+			const link = f.createEl("a", { text: "Report", href: "#", cls: "btoc-notice-report" });
+			link.addEventListener("click", (evt) => {
+				evt.preventDefault();
+				this.openReportModal(message);
+			});
+		});
+		new Notice(fragment, 10000);
+	}
+
+	/** Runs an async action and turns a failure into a reportable notice instead of a silent rejection. */
+	guard(label: string, task: Promise<unknown>): void {
+		task.catch((err: unknown) => this.notifyError(label, err));
 	}
 
 	/** Opens (or reveals) the tree view in the right sidebar. */
@@ -103,6 +187,14 @@ export default class BtocPlugin extends Plugin {
 	 * note is created. Modifier keys (or middle click) open a new tab or split instead.
 	 */
 	async openNode(id: string, evt: MouseEvent): Promise<void> {
+		try {
+			await this.openNodeUnguarded(id, evt);
+		} catch (err) {
+			this.notifyError("Could not open the note.", err);
+		}
+	}
+
+	private async openNodeUnguarded(id: string, evt: MouseEvent): Promise<void> {
 		const ws = this.app.workspace;
 		const leaf = this.editorLeaf(Keymap.isModEvent(evt));
 		const file = this.graph.fileOf(id);
@@ -191,4 +283,19 @@ export default class BtocPlugin extends Plugin {
 		}
 		menu.showAtMouseEvent(evt);
 	}
+}
+
+function platformName(): string {
+	const os = Platform.isIosApp
+		? "iOS"
+		: Platform.isAndroidApp
+			? "Android"
+			: Platform.isMacOS
+				? "macOS"
+				: Platform.isWin
+					? "Windows"
+					: Platform.isLinux
+						? "Linux"
+						: "unknown OS";
+	return `${Platform.isMobile ? "mobile" : "desktop"}, ${os}`;
 }

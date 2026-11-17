@@ -3,6 +3,7 @@ import type { NodeActions } from "./actions";
 import { neighborhood, outline } from "./graph";
 import { layout, type Orientation, type TreeStyle } from "./layout";
 import { cleanLink } from "./links";
+import { log } from "./log";
 import type BtocPlugin from "./main";
 import { renderOutline } from "./render-outline";
 import { TreeCanvas } from "./render-tree";
@@ -116,15 +117,22 @@ class TocBlock extends MarkdownRenderChild {
 			el.createDiv({ cls: "btoc-empty", text: `${name} has no parent or child links.` });
 			return;
 		}
-		const sub = neighborhood(g, root, this.opts.up, this.opts.down);
-		if (this.opts.mode === "tree") {
-			const host = el.createDiv({ cls: "btoc-block-tree" });
-			host.setCssProps({ height: `${this.opts.height}px` });
-			const lay = layout(g, sub, { orientation: this.opts.orientation ?? this.plugin.settings.orientation, style: this.opts.style ?? this.plugin.settings.treeStyle });
-			this.canvas = new TreeCanvas(host, lay, this.actions, root);
-			this.addChild(this.canvas);
-		} else {
-			renderOutline(el, g, outline(g, sub), this.actions, { focus: root, collapsed: this.collapsed });
+		try {
+			const sub = neighborhood(g, root, this.opts.up, this.opts.down);
+			if (this.opts.mode === "tree") {
+				const host = el.createDiv({ cls: "btoc-block-tree" });
+				host.setCssProps({ height: `${this.opts.height}px` });
+				const lay = layout(g, sub, { orientation: this.opts.orientation ?? this.plugin.settings.orientation, style: this.opts.style ?? this.plugin.settings.treeStyle });
+				this.canvas = new TreeCanvas(host, lay, this.actions, root);
+				this.addChild(this.canvas);
+			} else {
+				const label = `Table of contents of ${g.nodes.get(root)?.name ?? root}`;
+				renderOutline(el, g, outline(g, sub), this.actions, { focus: root, collapsed: this.collapsed, label });
+			}
+		} catch (err) {
+			log.error("Drawing a branching-toc block failed", err);
+			el.empty();
+			el.createDiv({ cls: "btoc-empty", text: "Could not draw this tree. Run the Report a problem command to send the details." });
 		}
 	}
 }

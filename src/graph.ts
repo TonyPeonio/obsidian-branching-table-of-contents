@@ -25,6 +25,8 @@ export interface Graph {
 	parents: Map<string, string[]>;
 	/** id -> child ids, sorted. */
 	children: Map<string, string[]>;
+	/** id -> position of the node in display order ({@link compareNodes}), so later sorts are cheap. */
+	rank: Map<string, number>;
 }
 
 /** A selection of the graph to draw: which nodes, which layer each sits on, and the edges among them. */
@@ -42,20 +44,27 @@ export interface Subgraph {
 }
 
 export function emptyGraph(): Graph {
-	return { nodes: new Map(), parents: new Map(), children: new Map() };
+	return { nodes: new Map(), parents: new Map(), children: new Map(), rank: new Map() };
 }
+
+// One collator for every comparison: localeCompare with options builds a new one per call, which
+// made sorting a 20,000-note vault take most of a second.
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
 export function compareNodes(a: GraphNode, b: GraphNode): number {
 	const ao = a.order ?? Number.POSITIVE_INFINITY;
 	const bo = b.order ?? Number.POSITIVE_INFINITY;
 	if (ao !== bo) return ao < bo ? -1 : 1;
-	const byName = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+	const byName = collator.compare(a.name, b.name);
 	if (byName !== 0) return byName;
 	return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
 export function compareIds(g: Graph): (a: string, b: string) => number {
 	return (a, b) => {
+		const ra = g.rank.get(a);
+		const rb = g.rank.get(b);
+		if (ra !== undefined && rb !== undefined) return ra - rb;
 		const na = g.nodes.get(a);
 		const nb = g.nodes.get(b);
 		if (!na || !nb) return a < b ? -1 : a > b ? 1 : 0;
@@ -67,6 +76,7 @@ export function compareIds(g: Graph): (a: string, b: string) => number {
 export function buildGraph(nodes: GraphNode[], edges: Edge[]): Graph {
 	const g = emptyGraph();
 	for (const n of nodes) if (!g.nodes.has(n.id)) g.nodes.set(n.id, n);
+	[...g.nodes.values()].sort(compareNodes).forEach((n, i) => g.rank.set(n.id, i));
 	const seen = new Set<string>();
 	for (const e of edges) {
 		if (e.parent === e.child) continue;
@@ -261,5 +271,60 @@ export function flattenOutline(items: OutlineItem[]): { item: OutlineItem; depth
 		}
 	};
 	walk(items, 0);
+	return out;
+}
+
+/**
+ * Groups of notes that are their own ancestors (strongly connected components with more than
+ * one note), each sorted, found with an iterative Tarjan so deep chains cannot overflow the stack.
+ */
+export function findCycles(g: Graph): string[][] {
+	const index = new Map<string, number>();
+	const low = new Map<string, number>();
+	const onStack = new Set<string>();
+	const stack: string[] = [];
+	const out: string[][] = [];
+	let next = 0;
+	for (const start of g.nodes.keys()) {
+		if (index.has(start)) continue;
+		const work: { id: string; i: number }[] = [{ id: start, i: 0 }];
+		index.set(start, next);
+		low.set(start, next);
+		next++;
+		stack.push(start);
+		onStack.add(start);
+		while (work.length) {
+			const frame = work[work.length - 1];
+			const kids = childrenOf(g, frame.id);
+			if (frame.i < kids.length) {
+				const c = kids[frame.i++];
+				if (!index.has(c)) {
+					index.set(c, next);
+					low.set(c, next);
+					next++;
+					stack.push(c);
+					onStack.add(c);
+					work.push({ id: c, i: 0 });
+				} else if (onStack.has(c)) {
+					low.set(frame.id, Math.min(low.get(frame.id) ?? 0, index.get(c) ?? 0));
+				}
+				continue;
+			}
+			work.pop();
+			const parent = work[work.length - 1];
+			if (parent) low.set(parent.id, Math.min(low.get(parent.id) ?? 0, low.get(frame.id) ?? 0));
+			if (low.get(frame.id) === index.get(frame.id)) {
+				const comp: string[] = [];
+				for (;;) {
+					const v = stack.pop();
+					if (v === undefined) break;
+					onStack.delete(v);
+					comp.push(v);
+					if (v === frame.id) break;
+				}
+				if (comp.length > 1) out.push(comp.sort());
+			}
+		}
+	}
 	return out;
 }

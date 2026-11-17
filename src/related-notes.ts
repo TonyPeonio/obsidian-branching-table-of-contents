@@ -8,7 +8,7 @@ export type Relation = "child" | "parent";
 /** Asks for a title, then creates the note linked to `current`. */
 export function promptRelatedNote(plugin: BtocPlugin, current: TFile, relation: Relation): void {
 	const heading = relation === "child" ? `New child of ${current.basename}` : `New parent of ${current.basename}`;
-	new TitleModal(plugin.app, heading, (title) => void createRelatedNote(plugin, current, title, relation)).open();
+	new TitleModal(plugin.app, heading, (title) => plugin.guard("Could not create the note.", createRelatedNote(plugin, current, title, relation))).open();
 }
 
 /** Characters Obsidian does not allow in file names. */

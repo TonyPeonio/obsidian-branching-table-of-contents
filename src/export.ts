@@ -12,7 +12,7 @@ export function pickRootAndGenerate(plugin: BtocPlugin): void {
 		new Notice("No note has children yet.");
 		return;
 	}
-	new RootPickerModal(plugin.app, candidates, (n) => void generateTocNote(plugin, n.id)).open();
+	new RootPickerModal(plugin.app, candidates, (n) => plugin.guard("Could not write the table of contents note.", generateTocNote(plugin, n.id))).open();
 }
 
 export async function generateTocNote(plugin: BtocPlugin, rootId: string): Promise<void> {
@@ -49,7 +49,7 @@ export async function generateTocNote(plugin: BtocPlugin, rootId: string): Promi
 			"Replace existing note?",
 			`"${path}" already exists. Replace its contents with the new table of contents?`,
 			"Replace",
-			() => void write(),
+			() => plugin.guard("Could not write the table of contents note.", write()),
 		).open();
 	} else {
 		await write();
