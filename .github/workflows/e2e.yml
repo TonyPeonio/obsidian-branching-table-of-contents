@@ -52,7 +52,8 @@ jobs:
           set -o pipefail
           npx wdio run ./wdio.conf.mts 2>&1 | tee e2e.log
         env:
-          OBSIDIAN_VERSIONS: earliest latest
+          # Pinned: "latest" can resolve to an Insiders-only build. 1.7.2 is minAppVersion.
+          OBSIDIAN_VERSIONS: 1.7.2 1.15.1
 
       # Make the failure readable without signing in: annotations are public, raw logs are not.
       - name: Report failures as annotations
