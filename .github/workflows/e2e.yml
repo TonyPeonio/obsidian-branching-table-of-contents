@@ -58,6 +58,6 @@ jobs:
       - name: Report failures as annotations
         if: failure()
         run: |
-          grep -v '^\s*at ' e2e.log | grep -iE -B2 -A12 'error|fail|✖|expect' | tail -c 30000 > e2e-failures.txt || true
+          grep -v '^\s*at ' e2e.log | cut -c1-300 | grep -iE -B3 -A15 'error|fail|✖|expect' | tail -c 30000 > e2e-failures.txt || true
           body=$(sed -e 's/%/%25/g' e2e-failures.txt | awk '{printf "%s%%0A", $0}')
           echo "::error title=E2E output::${body}"
