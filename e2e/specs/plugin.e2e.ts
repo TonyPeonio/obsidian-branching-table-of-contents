@@ -95,14 +95,24 @@ describe("Branching Table of Contents in Obsidian", function () {
 
 	it("shows its settings, including Report a problem", async function () {
 		await browser.executeObsidianCommand("app:open-settings");
-		await browser.pause(500);
 		await browser.executeObsidian(({ app }) => {
 			(app as unknown as { setting: { openTabById(id: string): void } }).setting.openTabById("branching-table-of-contents");
 		});
-		const named = (text: string) => $(`//*[contains(@class,'setting-item-name') and normalize-space(.)='${text}']`);
-		await named("Parent properties").waitForExist({ timeout: 10000 });
-		await expect(named("Tree style")).toExist();
-		await expect(named("Report a problem")).toExist();
+		// Read the tab's rows through the app rather than the main window's DOM: depending on the
+		// Obsidian version, settings open as a dialog in the main window or in a window of their own.
+		const names = () =>
+			browser.executeObsidian(({ app }) => {
+				const tab = (app as unknown as { setting: { activeTab?: { id?: string; containerEl?: HTMLElement } } }).setting.activeTab;
+				if (tab?.id !== "branching-table-of-contents") return [];
+				return Array.from(tab.containerEl?.querySelectorAll(".setting-item-name") ?? []).map((el) => (el.textContent ?? "").trim());
+			});
+		await browser.waitUntil(async () => (await names()).includes("Parent properties"), {
+			timeout: 10000,
+			timeoutMsg: "the plugin's settings tab did not show its settings",
+		});
+		const shown = await names();
+		expect(shown).toContain("Tree style");
+		expect(shown).toContain("Report a problem");
 		await browser.executeObsidian(({ app }) => (app as unknown as { setting: { close(): void } }).setting.close());
 	});
 });
