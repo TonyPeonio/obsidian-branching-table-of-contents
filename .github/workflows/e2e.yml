@@ -15,6 +15,11 @@ permissions:
 
 jobs:
   e2e:
+    name: e2e (Obsidian ${{ matrix.obsidian }})
+    strategy:
+      fail-fast: false
+      matrix:
+        obsidian: ["1.7.2", "1.15.1"]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -33,8 +38,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .obsidian-cache
-          key: obsidian-cache-${{ runner.os }}-${{ hashFiles('manifest.json', 'package-lock.json') }}
-          restore-keys: obsidian-cache-${{ runner.os }}-
+          key: obsidian-cache-${{ runner.os }}-${{ matrix.obsidian }}-${{ hashFiles('package-lock.json') }}
 
       - name: Set up a virtual display
         run: |
@@ -53,7 +57,7 @@ jobs:
           npx wdio run ./wdio.conf.mts 2>&1 | tee e2e.log
         env:
           # Pinned: "latest" can resolve to an Insiders-only build. 1.7.2 is minAppVersion.
-          OBSIDIAN_VERSIONS: 1.7.2 1.15.1
+          OBSIDIAN_VERSIONS: ${{ matrix.obsidian }}
 
       # Make the failure readable without signing in: annotations are public, raw logs are not.
       - name: Report failures as annotations
